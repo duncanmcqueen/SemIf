@@ -1,6 +1,6 @@
 # Intel Arc XPU Port
 
-This note describes the changes that make OpenJEV run on an Intel Arc discrete GPU.
+This note describes the changes that make SemIf run on an Intel Arc discrete GPU.
 The same method can apply to other Intel Arc cards with enough VRAM.
 
 ## Hardware
