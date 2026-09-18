@@ -46,13 +46,15 @@ def main() -> None:
     model, tokenizer, metadata = load_causal_model(args.model, args.revision)
     import torch
 
+    accelerator = getattr(torch, next(model.parameters()).device.type)
+
     warm = next(iter(groups.values()))[0]
     score_pair_batch(model, tokenizer, [(warm, option) for option in warm["options"]], args.max_tokens)
     report = {
         "version": "shape777-reranker-published-v1",
         "input_sha256": hashlib.sha256(args.input.read_bytes()).hexdigest(),
         "model": metadata,
-        "hardware": torch.cuda.get_device_name(0),
+        "hardware": accelerator.get_device_name(0),
         "semantic_contract": (
             "Two independent yes/no relevance passes per binary decision; "
             "option log-odds normalized only for relative comparison."
@@ -61,7 +63,7 @@ def main() -> None:
     }
     prediction_lines = []
     for size in sizes:
-        torch.cuda.reset_peak_memory_stats()
+        accelerator.reset_peak_memory_stats()
         started = time.perf_counter()
         state_times, predictions = [], []
         forward_seconds = padded_tokens = 0
@@ -100,7 +102,7 @@ def main() -> None:
             "state_latency_p50_seconds": statistics.median(state_times),
             "state_latency_p95_seconds": percentile(state_times, 0.95),
             "padded_tokens": padded_tokens,
-            "peak_cuda_bytes": torch.cuda.max_memory_allocated(),
+            "peak_cuda_bytes": accelerator.max_memory_allocated(),
         }
         report["results"].append(record)
         prediction_lines.extend({"pair_batch_size": size, **row} for row in predictions)

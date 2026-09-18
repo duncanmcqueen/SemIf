@@ -44,6 +44,9 @@ export HF_HOME=/path/to/large-drive/huggingface
 pip install -e '.[test]'
 ```
 
+Intel Arc users can use the XPU port with an Intel PyTorch build.
+See [Intel Arc XPU Port](docs/INTEL_ARC.md) for the setup and known limits.
+
 Run the owned examples:
 
 ```bash

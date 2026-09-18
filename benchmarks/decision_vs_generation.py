@@ -9,7 +9,7 @@ import statistics
 import time
 from pathlib import Path
 
-from semif_phase1.core import load_causal_model
+from semif_phase1.core import load_causal_model, synchronize_device
 from semif_phase1.shared import score_shared
 
 
@@ -78,8 +78,7 @@ def run_generation(model, tokenizer, state: str, rows: list[dict], max_new_token
             streamer=streamer,
             use_cache=True,
         )
-    if next(model.parameters()).device.type == "cuda":
-        torch.cuda.synchronize()
+    synchronize_device(next(model.parameters()).device)
     total = time.perf_counter() - started
     generated = output[0, input_tokens:].detach().cpu().tolist()
     text = tokenizer.decode(generated, skip_special_tokens=True)
@@ -125,6 +124,8 @@ def main() -> None:
     model, tokenizer, metadata = load_causal_model(args.model, args.revision)
     import torch
 
+    accelerator = getattr(torch, next(model.parameters()).device.type)
+
     # Warm both paths; warmup is excluded from every reported duration.
     score_shared(model, tokenizer, rows, metadata)
     warmup = run_generation(model, tokenizer, rows[0]["state"], rows[:1], 16)
@@ -134,15 +135,15 @@ def main() -> None:
     direct_runs = []
     direct_outputs = None
     for _ in range(args.repeats):
-        torch.cuda.reset_peak_memory_stats()
+        accelerator.reset_peak_memory_stats()
         direct_outputs, timing = score_shared(model, tokenizer, rows, metadata)
-        direct_runs.append({**timing, "peak_cuda_bytes": torch.cuda.max_memory_allocated()})
+        direct_runs.append({**timing, "peak_cuda_bytes": accelerator.max_memory_allocated()})
 
     generation_runs = []
     for _ in range(args.repeats):
-        torch.cuda.reset_peak_memory_stats()
+        accelerator.reset_peak_memory_stats()
         run = run_generation(model, tokenizer, rows[0]["state"], rows, args.max_new_tokens)
-        run["peak_cuda_bytes"] = torch.cuda.max_memory_allocated()
+        run["peak_cuda_bytes"] = accelerator.max_memory_allocated()
         generation_runs.append(run)
 
     direct_choices = [
@@ -156,7 +157,7 @@ def main() -> None:
     report = {
         "version": "decision-vs-compact-generation-v2",
         "model": metadata,
-        "hardware": torch.cuda.get_device_name(0),
+        "hardware": accelerator.get_device_name(0),
         "input": {
             "path": str(args.input),
             "sha256": hashlib.sha256(args.input.read_bytes()).hexdigest(),

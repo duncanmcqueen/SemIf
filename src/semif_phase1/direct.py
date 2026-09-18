@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import time
 
-from .core import LETTERS, digest, direct_messages, softmax
+from .core import LETTERS, digest, direct_messages, softmax, synchronize_device
 
 PROMPT_VERSION = "direct-options-v1"
 
@@ -22,12 +22,36 @@ def _slot_ids(tokenizer, count: int) -> list[int]:
     return result
 
 
+# On XPU, one long forward can corrupt the last-token logits.
+# This failure occurs near 1813 tokens on Arc A770 with Qwen3.5-4B.
+# Split long XPU inputs into short KV-cache steps.
+# The CPU result is bit-identical to one full forward.
+_XPU_FORWARD_TOKEN_LIMIT = 1024
+
+
 def _forward(model, inputs):
     parameters = inspect.signature(model.forward).parameters
     kwargs = dict(inputs, use_cache=False, return_dict=True)
     if "logits_to_keep" in parameters:
         kwargs["logits_to_keep"] = 1
-    return model(**kwargs).logits[:, -1, :]
+    ids = inputs["input_ids"]
+    if ids.device.type != "xpu" or ids.shape[1] <= _XPU_FORWARD_TOKEN_LIMIT:
+        return model(**kwargs).logits[:, -1, :]
+    cache = None
+    for start in range(0, ids.shape[1], _XPU_FORWARD_TOKEN_LIMIT):
+        piece = ids[:, start : start + _XPU_FORWARD_TOKEN_LIMIT]
+        call = {
+            "input_ids": piece,
+            "attention_mask": inputs["attention_mask"][:, : start + piece.shape[1]],
+            "use_cache": True,
+            "return_dict": True,
+            "past_key_values": cache,
+        }
+        if "logits_to_keep" in parameters:
+            call["logits_to_keep"] = 1
+        output = model(**call)
+        cache = output.past_key_values
+    return output.logits[:, -1, :]
 
 
 def encode_prompt(tokenizer, row: dict, max_tokens: int) -> tuple[list[int], list[int], str]:
@@ -55,13 +79,11 @@ def score(model, tokenizer, row: dict, metadata: dict, max_tokens: int = 4096) -
         "input_ids": torch.tensor([ids], dtype=torch.long, device=device),
         "attention_mask": torch.ones((1, len(ids)), dtype=torch.long, device=device),
     }
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
+    synchronize_device(device)
     forward_start = time.perf_counter()
     with torch.inference_mode():
         vocabulary = _forward(model, inputs)[0].float()
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
+    synchronize_device(device)
     selected = vocabulary[slots].cpu().tolist()
     return {
         "id": row["id"],
