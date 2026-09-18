@@ -120,18 +120,22 @@ Same frozen Qwen3.5-4B, same owned state, same 21 binary criteria, one RTX 3090:
 
 The compact generative baseline emits only ordered `"yes"`/`"no"` values—no keys, confidence objects, or explanations. Its median first-token time was 0.489 s, but completing the array took **5.21×** as long as direct readout. All three arrays were valid and identical. Their choices agreed with direct argmax on 18/21 criteria, so this is a systems comparison rather than a claim that the two readouts are semantically equivalent. [Exact prompt, outputs, token timeline, and runs](results/raw/decision-vs-compact-array.json) are committed.
 
+On this fork's A770 test system, the same 21-decision direct readout took 9.33 s at median. The generation leg produced no valid array on XPU. See [Intel Arc XPU Port](docs/INTEL_ARC.md) for that limit.
+
 ### Reusing a state across 21 decisions
 
 On an owned 37-state × 21-criterion workload:
 
-| Execution path | Decisions/s | 777 decisions |
-|---|---:|---:|
-| Fresh direct scoring | 2.33 | 333.1 s |
-| Serial prefix reuse | 10.75 | 72.3 s |
-| Parallel suffixes | **20.03** | **38.8 s** |
-| Native reranker | 1.86 | 417.3 s |
+| Execution path | Decisions/s (RTX 3090) | 777 decisions (RTX 3090) | Decisions/s (A770) | 777 decisions (A770) |
+|---|---:|---:|---:|---:|
+| Fresh direct scoring | 2.33 | 333.1 s | 0.29 | 2672.2 s |
+| Serial prefix reuse | 10.75 | 72.3 s | 1.95 | 398.2 s |
+| Parallel suffixes | **20.03** | **38.8 s** | **2.33** | **333.4 s** |
+| Native reranker (pair batch 1) | 1.86 | 417.3 s | 1.45 | 534.4 s |
 
 The owned [37×21 fixture](benchmarks/data/shape777.jsonl), [direct/reuse runner](benchmarks/shape777.py), [reranker runner](benchmarks/shape777_reranker.py), [raw timings](results/raw/shape777-direct.json), and [row-level predictions](results/raw/shape777-direct.predictions.jsonl) are included. The fast reuse paths are experimental: BF16 execution changed 5–6 of 777 argmaxes relative to fresh scoring.
+
+The A770 columns are measurements from this fork. The test system used one Intel Arc A770 with torch 2.10.0+xpu and the XPU forward-split workaround. The A770 is the boot GPU and shares time with desktop programs, so its timings carry some noise. The dense reranker path runs at 1.2 to 1.3 times the RTX 3090 time. The hybrid Qwen3.5 paths run 5 to 9 times slower. Missing fused kernels on XPU cause that gap. See [A770 performance notes](docs/A770-PERF-GAP.md) for the full analysis and research leads.
 
 ## Quality
 
