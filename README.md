@@ -135,7 +135,7 @@ On an owned 37-state × 21-criterion workload:
 
 The owned [37×21 fixture](benchmarks/data/shape777.jsonl), [direct/reuse runner](benchmarks/shape777.py), [reranker runner](benchmarks/shape777_reranker.py), [raw timings](results/raw/shape777-direct.json), and [row-level predictions](results/raw/shape777-direct.predictions.jsonl) are included. The fast reuse paths are experimental: BF16 execution changed 5–6 of 777 argmaxes relative to fresh scoring.
 
-The A770 columns are measurements from this fork. The test system used one Intel Arc A770 with torch 2.10.0+xpu and the XPU forward-split workaround. The A770 is the boot GPU and shares time with desktop programs, so its timings carry some noise. The dense reranker path runs at 1.2 to 1.3 times the RTX 3090 time. The hybrid Qwen3.5 paths run 5 to 9 times slower. Missing fused kernels on XPU cause that gap. See [A770 performance notes](docs/A770-PERF-GAP.md) for the full analysis and research leads.
+The A770 columns are measurements from this fork. The test system used one Intel Arc A770 with torch 2.10.0+xpu and the XPU forward-split workaround. The dense reranker path runs at 1.2 to 1.3 times the RTX 3090 time. The hybrid Qwen3.5 paths run 5 to 9 times slower. Missing fused kernels on XPU cause that gap. See [A770 performance notes](docs/A770-PERF-GAP.md) for the full analysis and research leads.
 
 ## Quality
 
