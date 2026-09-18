@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Semantic ifs from open models, on a 3090 at home.**
+**Semantic ifs from open models, on a ~~3090~~Intel Arc A770 at home.**
 
 *Independent project; not affiliated with Jev or TypeSafe.*
 
