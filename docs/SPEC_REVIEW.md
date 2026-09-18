@@ -3,21 +3,21 @@
 The port implements the accelerator plumbing specified in the local workspace
 file `A770-PORT-SPEC.md`, which is outside this repository. It is not a fully
 validated replacement for every CUDA execution path. Direct scoring has the
-strongest A770 evidence. Generation remains unsuccessful, reranker drift
-remains unexplained, and long serial/shared forwards bypass the direct
-scorer's corruption workaround.
+strongest A770 evidence. Generation remains unsuccessful and reranker drift
+remains unexplained. The serial and shared paths now use the same
+chunked-forward workaround as direct scoring.
 
 ## Remaining findings
 
-1. **High: long serial/shared inputs remain exposed to XPU corruption.**
-   `src/semif_phase1/serial.py` calls `_cached_forward` on the whole prefix and
-   suffix. `src/semif_phase1/shared.py` likewise calls the model without chunking.
-   Both accept full prompts up to 4096 tokens. A state or criterion that pushes
-   either call beyond the observed Qwen3.5 failure threshold can therefore
-   produce unreliable scores. The successful 777-row fixture is not coverage
-   for the entire accepted input range. This is a code-path finding grounded in
-   the earlier corruption investigation. This review did not repeat that
-   investigation or establish a universal safe threshold.
+1. **Resolved: long serial/shared inputs are no longer exposed to XPU
+   corruption.** `direct.cached_forward` now chunks every cached forward longer
+   than 1024 tokens on XPU, including prefix prefills and suffixes that thread
+   an existing branch cache. `shared.py` and `serial.py` use it for both
+   calls. CPU tests verify the chunked cache against a single-forward cache at
+   1025 and 2049 tokens, and verify suffix threading through an existing cache.
+   A full A770 rerun of both modes matched the published NVIDIA choices at
+   drift grade. Shared differed on 6 / 777 rows with maximum difference
+   0.0927. Serial differed on 4 / 777 rows with maximum difference 0.0912.
 2. **High: compact generation is not validated on A770.**
    `benchmarks/decision_vs_generation.py` still uses an unsplit `model.generate`
    prefill. The existing A770 report records three invalid arrays, each reaching

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from semif_phase1.core import load_causal_model, synchronize_device
-from semif_phase1.direct import _forward
+from semif_phase1.direct import _forward, cached_forward
 
 
 @pytest.mark.parametrize("backend,count", [("cuda", 1), ("xpu", 1), ("xpu", 2)])
@@ -90,3 +90,73 @@ def test_chunked_forward_rejects_missing_cache():
     ids = torch.ones((1, 1025), dtype=torch.long)
     with pytest.raises(RuntimeError, match="native KV cache"):
         _forward(NoCache(), {"input_ids": XpuInput(ids), "attention_mask": ids})
+
+
+def _tiny_qwen3():
+    import torch
+    from transformers import Qwen3Config, Qwen3ForCausalLM
+
+    torch.manual_seed(0)
+    return Qwen3ForCausalLM(Qwen3Config(
+        vocab_size=32, hidden_size=16, intermediate_size=32, num_hidden_layers=1,
+        num_attention_heads=2, num_key_value_heads=1, head_dim=8,
+    )).eval()
+
+
+@pytest.mark.parametrize("length", [1025, 2049])
+def test_chunked_cached_forward_matches_single_cache(length):
+    import torch
+
+    model = _tiny_qwen3()
+    ids = torch.randint(0, 32, (1, length))
+    mask = torch.ones_like(ids)
+    suffix = torch.randint(0, 32, (1, 7))
+    with torch.inference_mode():
+        reference = model(
+            input_ids=torch.cat([ids, suffix], dim=1), attention_mask=torch.ones((1, length + 7)),
+            use_cache=True, return_dict=True, logits_to_keep=1,
+        ).logits[:, -1, :]
+        cache = cached_forward(model, {"input_ids": ids, "attention_mask": mask}).past_key_values
+        assert cache.get_seq_length() == length
+        actual = cached_forward(model, {
+            "input_ids": suffix, "attention_mask": torch.ones((1, length + 7)),
+            "past_key_values": cache,
+        }).logits[:, -1, :]
+    torch.testing.assert_close(actual, reference, atol=1e-6, rtol=1e-5)
+
+
+def test_chunked_cached_forward_rejects_missing_cache():
+    import torch
+
+    class NoCache:
+        def forward(self, **kwargs):
+            return SimpleNamespace(past_key_values=None)
+
+        __call__ = forward
+
+    ids = torch.ones((1, 1025), dtype=torch.long)
+    with pytest.raises(RuntimeError, match="native KV cache"):
+        cached_forward(NoCache(), {"input_ids": XpuInput(ids), "attention_mask": ids})
+
+
+def test_chunked_cached_suffix_threads_existing_cache():
+    import torch
+
+    model = _tiny_qwen3()
+    prefix = torch.randint(0, 32, (1, 700))
+    suffix = torch.randint(0, 32, (1, 1500))
+    ids = torch.cat([prefix, suffix], dim=1)
+    with torch.inference_mode():
+        reference = model(
+            input_ids=ids, attention_mask=torch.ones((1, 2200)),
+            use_cache=True, return_dict=True, logits_to_keep=1,
+        ).logits[:, -1, :]
+        cache = cached_forward(
+            model, {"input_ids": prefix, "attention_mask": torch.ones((1, 700))}
+        ).past_key_values
+        actual = cached_forward(model, {
+            "input_ids": XpuInput(suffix),
+            "attention_mask": torch.ones((1, 2200)),
+            "past_key_values": cache,
+        }).logits[:, -1, :]
+    torch.testing.assert_close(actual, reference, atol=1e-6, rtol=1e-5)

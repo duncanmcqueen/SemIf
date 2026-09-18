@@ -55,7 +55,8 @@ The failure affects the hybrid Qwen3.5 architecture.
 Dense Qwen3 models did not show this failure in the tests.
 
 The direct scorer uses a workaround on XPU only.
-If the input is longer than 1024 tokens, it splits the input into short steps.
+The serial and shared scorers use the same workaround.
+If one forward would exceed 1024 tokens, the scorer splits it into short steps.
 Each step uses the model KV cache.
 The final logits come from the last step.
 
@@ -66,11 +67,9 @@ The result is still a direct option-logit score.
 
 ## Known Limits
 
-The workaround applies only to the direct scorer.
+The decision, serial, and shared scorers all split long XPU forwards through
+the KV cache.
 Other code paths that call one long XPU forward can still fail.
-In particular, serial and shared scoring still prefill the entire state in one
-call and process each suffix in one call. Their successful shape777 measurements
-do not establish support for arbitrary inputs up to the 4096-token CLI limit.
 
 The compact generation benchmark still has this limit.
 The `generate()` call performs its own long prefill.
@@ -94,6 +93,11 @@ It compared against the published NVIDIA row-level predictions.
 | `fresh` | 7 / 777 | 0.0865 |
 | `serial_prefix` | 4 / 777 | 0.0622 |
 | `parallel_shared` | 3 / 777 | 0.1131 |
+
+A later rerun with the serial and shared prefill paths split gave the same
+drift grade. Shared scored 6 / 777 different choices with maximum difference
+0.0927. Serial scored 4 / 777 different choices with maximum difference
+0.0912.
 
 The published NVIDIA run has 5 / 777 flips between fresh and serial modes.
 The A770 result is within the same drift range for this BF16 workload.
