@@ -79,7 +79,7 @@ def synchronize_device(device) -> None:
         torch.xpu.synchronize(device)
 
 
-def load_causal_model(source: str, revision: str):
+def load_causal_model(source: str, revision: str, attn_implementation: str = "sdpa"):
     """Load one pinned causal model on the sole visible accelerator device."""
     import torch
     import transformers
@@ -114,7 +114,7 @@ def load_causal_model(source: str, revision: str):
         config=config,
         dtype=torch.bfloat16,
         device_map={"": f"{backend}:0"},
-        attn_implementation="sdpa",
+        attn_implementation=attn_implementation,
         low_cpu_mem_usage=True,
         output_loading_info=True,
         **common,
@@ -126,6 +126,7 @@ def load_causal_model(source: str, revision: str):
         "source": source,
         "revision": revision,
         "dtype": "bfloat16",
+        "attention": attn_implementation,
         "torch_version": torch.__version__,
         "transformers_version": transformers.__version__,
     }

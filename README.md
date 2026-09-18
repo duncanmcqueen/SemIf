@@ -120,7 +120,7 @@ Same frozen Qwen3.5-4B, same owned state, same 21 binary criteria, one RTX 3090:
 
 The compact generative baseline emits only ordered `"yes"`/`"no"` values—no keys, confidence objects, or explanations. Its median first-token time was 0.489 s, but completing the array took **5.21×** as long as direct readout. All three arrays were valid and identical. Their choices agreed with direct argmax on 18/21 criteria, so this is a systems comparison rather than a claim that the two readouts are semantically equivalent. [Exact prompt, outputs, token timeline, and runs](results/raw/decision-vs-compact-array.json) are committed.
 
-On this fork's A770 test system, the same 21-decision direct readout took 9.33 s at median. The generation leg produced no valid array on XPU. See [Intel Arc XPU Port](docs/INTEL_ARC.md) for that limit.
+On this fork's A770 test system, the same 21-decision direct readout took 8.9 s at median, and the compact generated array took 14.4 s at median (ratio 1.62). All three generation repeats returned the same valid 21-item array, and its choices matched the published NVIDIA array exactly. Agreement with direct argmax was 18/21, the published value. The A770 generation run uses chunked prefill and eager attention; see [Intel Arc XPU Port](docs/INTEL_ARC.md).
 
 ### Reusing a state across 21 decisions
 

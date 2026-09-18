@@ -3,9 +3,10 @@
 The port implements the accelerator plumbing specified in the local workspace
 file `A770-PORT-SPEC.md`, which is outside this repository. It is not a fully
 validated replacement for every CUDA execution path. Direct scoring has the
-strongest A770 evidence. Generation remains unsuccessful and reranker drift
-remains unexplained. The serial and shared paths now use the same
-chunked-forward workaround as direct scoring.
+strongest A770 evidence. Compact generation is now validated on the A770 with
+chunked prefill and eager attention. Reranker drift remains unexplained. The
+serial and shared paths use the same chunked-forward workaround as direct
+scoring.
 
 ## Remaining findings
 
@@ -18,11 +19,20 @@ chunked-forward workaround as direct scoring.
    A full A770 rerun of both modes matched the published NVIDIA choices at
    drift grade. Shared differed on 6 / 777 rows with maximum difference
    0.0927. Serial differed on 4 / 777 rows with maximum difference 0.0912.
-2. **High: compact generation is not validated on A770.**
-   `benchmarks/decision_vs_generation.py` still uses an unsplit `model.generate`
-   prefill. The existing A770 report records three invalid arrays, each reaching
-   128 output tokens, and null agreement. Its timing ratio must not be treated
-   as the published successful generation comparison.
+2. **Resolved: compact generation is validated on the A770.** Two XPU defects
+   blocked this leg. One long `generate()` prefill hit the known corruption
+   beyond 1812 tokens. A separate decode-side SDPA collapse produced repeated
+   token 0 after one correct token. The benchmark now passes
+   `prefill_chunk_size=512` and loads the model with eager attention. With
+   those settings, all three repeats produced the same complete 21-item
+   array. The choices match the published NVIDIA generation array exactly,
+   and the agreement with direct argmax is 18 / 21, the published value.
+   Chunk size 1024 produced a 20-item array. A CPU check produced the
+   identical 21-item array with and without prefill chunking, so the chunked
+   prefill is numerically innocent. The missing item at chunk size 1024 is a
+   decode-side near-tie flip on XPU, the same drift class as the 5 / 777
+   scoring flips. The direct leg of this run uses eager attention and agrees
+   with the published direct choices on all 21 rows.
 3. **High: reranker agreement is unresolved.** Matching the A770 and NVIDIA
    row-level files by decision ID and pair batch size gives the differences
    below. The original spec explicitly treats drift as informational, so this

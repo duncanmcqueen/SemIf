@@ -67,3 +67,26 @@ def test_generation_records_invalid_array_members(answer):
     result = benchmark("decision_vs_generation").run_generation(
         model, Tokenizer(), "state", [{"question": "criterion"}], 5)
     assert result["valid_complete_array"] == (answer == '["yes"]')
+
+
+def test_generation_prefill_chunking_matches_plain_generate():
+    import torch
+    from transformers import Qwen3Config, Qwen3ForCausalLM
+
+    torch.manual_seed(0)
+    model = Qwen3ForCausalLM(Qwen3Config(
+        vocab_size=32, hidden_size=16, intermediate_size=32, num_hidden_layers=1,
+        num_attention_heads=2, num_key_value_heads=1, head_dim=8,
+    )).eval()
+    ids = torch.randint(0, 32, (1, 25))
+    mask = torch.ones_like(ids)
+    with torch.inference_mode():
+        plain = model.generate(
+            input_ids=ids, attention_mask=mask, do_sample=False,
+            max_new_tokens=8, use_cache=True,
+        )
+        chunked = model.generate(
+            input_ids=ids, attention_mask=mask, do_sample=False,
+            max_new_tokens=8, use_cache=True, prefill_chunk_size=7,
+        )
+    assert torch.equal(plain, chunked)

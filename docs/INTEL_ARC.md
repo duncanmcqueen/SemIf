@@ -71,9 +71,18 @@ The decision, serial, and shared scorers all split long XPU forwards through
 the KV cache.
 Other code paths that call one long XPU forward can still fail.
 
-The compact generation benchmark still has this limit.
-The `generate()` call performs its own long prefill.
-The current port does not split that internal prefill.
+The compact generation benchmark needs two settings on XPU:
+
+```bash
+--prefill-chunk-size 512 --attention eager
+```
+
+Chunked prefill keeps every prefill forward below the corruption length.
+Eager attention avoids a separate decode-side collapse that repeats token 0
+under SDPA. With both settings, generation reproduced the published NVIDIA
+array exactly. Chunk size 1024 produced a 20-item array instead of 21, so the
+array terminator sits on a numerics near-tie. Chunk sizes above 1812 are not
+safe on XPU.
 
 The direct scorer is the validated A770 path.
 The reranker benchmark ran on A770, but its choices drifted from the NVIDIA output.
@@ -108,9 +117,11 @@ Comparing matching pair batch sizes gives 138 / 777 differing choices at size 1,
 329 / 777 at size 4, and 341 / 777 at size 8. The cause is unresolved; completion
 and finite probabilities alone do not validate this path's numerical behavior.
 
-The saved compact-generation run produced no valid complete array in any of its
-three repetitions. Its wall-time ratio is not a successful A770 reproduction of
-the published generation comparison.
+A later compact-generation run with chunked prefill and eager attention
+produced the same complete 21-item array in all three repeats. Its choices
+match the published NVIDIA array exactly. Agreement with direct argmax is
+18 / 21, the published value. Generation took 14.4 s at median against the
+published 5.3 s on the RTX 3090.
 
 See [the specification review](SPEC_REVIEW.md) for the audit scope, fixes, and
 the distinction between existing full benchmark evidence and fresh smoke tests.

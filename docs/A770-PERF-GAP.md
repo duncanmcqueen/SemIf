@@ -26,8 +26,8 @@ revisions, same prompt builder.
 | shape777 shared | 39 s (20.03 dec/s) | 333 s (2.33 dec/s) | 8.6x |
 | Reranker, pair batch 1 | 417 s (1.86 j/s) | 534 s (1.45 j/s) | 1.28x |
 | Reranker, pair batch 8 | 435 s (1.79 j/s) | 504 s (1.54 j/s) | 1.16x |
-| 21-decision shared readout | 1.02 s | 9.33 s | 9.1x |
-| Compact generation | 5.33 s | 16.2 s | n/a (output invalid on A770) |
+| 21-decision shared readout | 1.02 s | 8.9 s | 8.7x |
+| Compact generation | 5.33 s | 14.4 s | 2.7x |
 
 The reranker uses Qwen3-Reranker-4B, a dense transformer. Every slow row uses
 Qwen3.5-4B, the hybrid GatedDeltaNet (GDN) architecture. The dense path pays
@@ -147,7 +147,7 @@ A fix that addresses 5 percent of the wall time is not worth the risk.
 
 - Workspace measurement files (outside this repository):
   `runs/shape777-a770-t210.json`, `runs/shape777-reranker-a770.json`,
-  `runs/decision-vs-generation-a770.json`, `runs/sharedfix-regression.log`
+  `runs/decision-vs-generation-a770-final.json`, `runs/sharedfix-regression.log`
 - Published NVIDIA references: `../results/raw/shape777-direct.json`,
   `../results/raw/shape777-reranker.json`,
   `../results/raw/decision-vs-compact-array.json`
