@@ -16,6 +16,8 @@
 
 > **Independent research project.** SemIf was formerly called OpenJev. It is not affiliated with or endorsed by TypeSafe. Jev, TypeSafe, and other names and marks are the property of their respective owners. No infringement is intended.
 
+> **Intel Arc fork.** This repository is a fork of [TheoLeeCJ/SemIf](https://github.com/TheoLeeCJ/SemIf). The fork adds Intel Arc (XPU) support for the SemIf scorers. The upstream project targets NVIDIA CUDA GPUs. All upstream models, benchmarks, and published results are unchanged. See [Intel Arc XPU Port](docs/INTEL_ARC.md) for the port details, and [A770 performance notes](docs/A770-PERF-GAP.md) for measured speed on Arc.
+
 ![Some AI company asks you to join a waitlist; SemIf runs in your browser today](assets/semif-no-waitlist.png)
 
 Most agent decisions are small: *route this*, *retry that*, *does the evidence support X?* A chat model can answer them, but it spends time generating text that software immediately parses back into an `if` statement.
@@ -35,7 +37,10 @@ This baseline reads typed option probabilities directly from a model. No answer 
 serial prefix reuse, and parallel shared-state decisions on macOS arm64.
 Install `pip install -e '.[test,mlx]'` and add `--backend mlx` to the scorer command.
 
-Python 3.10+, CUDA, and a GPU that can hold a 4B BF16 model:
+**Intel Arc:** use the XPU port for the same paths on Arc GPUs.
+See the [Intel Arc setup](#intel-arc-setup-xpu) below.
+
+Python 3.10+, a CUDA, Intel Arc, or Apple-Silicon MLX backend, and enough memory for a 4B BF16 model:
 
 ```bash
 python -m venv .venv
@@ -44,8 +49,33 @@ export HF_HOME=/path/to/large-drive/huggingface
 pip install -e '.[test]'
 ```
 
-Intel Arc users can use the XPU port with an Intel PyTorch build.
-See [Intel Arc XPU Port](docs/INTEL_ARC.md) for the setup and known limits.
+### Intel Arc setup (XPU)
+
+Install the XPU build of PyTorch before the project packages:
+
+```bash
+pip install torch==2.10.0+xpu --index-url https://download.pytorch.org/whl/xpu
+```
+
+Then select exactly one Intel GPU for each scorer process. Do not assume the device index. Verify the name and UUID first:
+
+```bash
+ONEAPI_DEVICE_SELECTOR=level_zero:1 python -c \
+  "import torch; [print(i, torch.xpu.get_device_properties(i).name, torch.xpu.get_device_properties(i).uuid) for i in range(torch.xpu.device_count())]"
+```
+
+Use `ONEAPI_DEVICE_SELECTOR=level_zero:<index>` instead of `CUDA_VISIBLE_DEVICES`. With the A770 selected, the example above becomes:
+
+```bash
+ONEAPI_DEVICE_SELECTOR=level_zero:1 semif-score \
+  --mode direct \
+  --model Qwen/Qwen3.5-4B \
+  --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a \
+  --input examples/decisions.jsonl \
+  --output results.jsonl
+```
+
+[Intel Arc XPU Port](docs/INTEL_ARC.md) documents the port, the XPU forward-split workaround, and known limits. [A770 performance notes](docs/A770-PERF-GAP.md) records measured speed against the published RTX 3090 numbers.
 
 Run the owned examples:
 
@@ -151,6 +181,9 @@ Returned probabilities are conditional on the supplied options. Calibrate and va
 
 ## Documentation
 
+- [Intel Arc XPU Port](docs/INTEL_ARC.md) — fork: Arc setup, XPU workaround, and known limits
+- [A770 performance notes](docs/A770-PERF-GAP.md) — fork: measured Arc speed and research leads
+- [A770 specification review](docs/SPEC_REVIEW.md) — fork: audit scope, fixes, and open findings
 - [Results](docs/RESULTS.md) — quality, speed, perturbations, and claim boundaries
 - [Method](docs/METHOD.md) — frozen prompts, metrics, and timing scope
 - [Reproduce](docs/REPRODUCE.md) — exact environment, pinned commands, perturbations, and verification
