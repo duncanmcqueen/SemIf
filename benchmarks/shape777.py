@@ -10,6 +10,7 @@ import statistics
 import time
 from pathlib import Path
 
+from semif_phase1.artifacts import write_new_outputs
 from semif_phase1.core import load_causal_model
 from semif_phase1.direct import score
 from semif_phase1.serial import SerialPrefixScorer
@@ -24,8 +25,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-tokens", type=int, default=4096)
     args = parser.parse_args()
-    if args.output.exists():
-        parser.error("Output must be new")
+    predictions_path = args.output.with_suffix(".predictions.jsonl")
+    if any(
+        path.exists() or path.is_symlink() for path in (args.output, predictions_path)
+    ):
+        parser.error("Report and predictions outputs must be new")
     rows = [json.loads(line) for line in args.input.read_text().splitlines() if line.strip()]
     groups = defaultdict(list)
     for row in rows:
@@ -95,15 +99,14 @@ def main() -> None:
             "max_probability_difference": maximum,
             "argmax_flips": flips,
         }
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
-    args.output.with_suffix(".predictions.jsonl").write_text(
-        "".join(
+    write_new_outputs({
+        args.output: json.dumps(report, indent=2, allow_nan=False) + "\n",
+        predictions_path: "".join(
             json.dumps({"mode": mode, **row}, allow_nan=False) + "\n"
             for mode, values in predictions.items()
             for row in values
-        )
-    )
+        ),
+    })
     print(json.dumps(report["results"]))
 
 

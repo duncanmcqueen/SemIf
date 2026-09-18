@@ -10,6 +10,7 @@ import statistics
 import time
 from pathlib import Path
 
+from semif_phase1.artifacts import write_new_outputs
 from semif_phase1.core import load_causal_model, softmax
 from semif_phase1.reranker import score_pair_batch
 
@@ -32,8 +33,11 @@ def main() -> None:
     parser.add_argument("--pair-batch-sizes", default="1,4,8")
     parser.add_argument("--max-tokens", type=int, default=4096)
     args = parser.parse_args()
-    if args.output.exists():
-        parser.error("Output must be new")
+    predictions_path = args.output.with_suffix(".predictions.jsonl")
+    if any(
+        path.exists() or path.is_symlink() for path in (args.output, predictions_path)
+    ):
+        parser.error("Report and predictions outputs must be new")
     sizes = [int(value) for value in args.pair_batch_sizes.split(",")]
     if not sizes or min(sizes) < 1:
         parser.error("Pair batch sizes must be positive")
@@ -106,11 +110,10 @@ def main() -> None:
         }
         report["results"].append(record)
         prediction_lines.extend({"pair_batch_size": size, **row} for row in predictions)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
-    args.output.with_suffix(".predictions.jsonl").write_text(
-        "".join(json.dumps(row, allow_nan=False) + "\n" for row in prediction_lines)
-    )
+    write_new_outputs({
+        args.output: json.dumps(report, indent=2, allow_nan=False) + "\n",
+        predictions_path: "".join(json.dumps(row, allow_nan=False) + "\n" for row in prediction_lines),
+    })
     print(json.dumps(report["results"]))
 
 

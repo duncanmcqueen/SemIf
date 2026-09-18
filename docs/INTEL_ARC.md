@@ -68,6 +68,9 @@ The result is still a direct option-logit score.
 
 The workaround applies only to the direct scorer.
 Other code paths that call one long XPU forward can still fail.
+In particular, serial and shared scoring still prefill the entire state in one
+call and process each suffix in one call. Their successful shape777 measurements
+do not establish support for arbitrary inputs up to the 4096-token CLI limit.
 
 The compact generation benchmark still has this limit.
 The `generate()` call performs its own long prefill.
@@ -97,6 +100,16 @@ The A770 result is within the same drift range for this BF16 workload.
 
 The A770 reranker run completed without a crash.
 It did not reproduce the NVIDIA row-level choices closely.
+Comparing matching pair batch sizes gives 138 / 777 differing choices at size 1,
+329 / 777 at size 4, and 341 / 777 at size 8. The cause is unresolved; completion
+and finite probabilities alone do not validate this path's numerical behavior.
+
+The saved compact-generation run produced no valid complete array in any of its
+three repetitions. Its wall-time ratio is not a successful A770 reproduction of
+the published generation comparison.
+
+See [the specification review](SPEC_REVIEW.md) for the audit scope, fixes, and
+the distinction between existing full benchmark evidence and fresh smoke tests.
 
 ## Commands
 

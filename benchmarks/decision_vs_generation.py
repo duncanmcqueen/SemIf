@@ -9,6 +9,7 @@ import statistics
 import time
 from pathlib import Path
 
+from semif_phase1.artifacts import write_new_outputs
 from semif_phase1.core import load_causal_model, synchronize_device
 from semif_phase1.shared import score_shared
 
@@ -88,7 +89,7 @@ def run_generation(model, tokenizer, state: str, rows: list[dict], max_new_token
         if (
             isinstance(candidate, list)
             and len(candidate) == len(rows)
-            and all(choice in {"yes", "no"} for choice in candidate)
+            and all(isinstance(choice, str) and choice in {"yes", "no"} for choice in candidate)
         ):
             parsed = candidate
     except json.JSONDecodeError:
@@ -186,8 +187,9 @@ def main() -> None:
         report["compact_generation"]["median_total_seconds"]
         / report["direct_parallel"]["median_total_seconds"]
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n")
+    write_new_outputs({
+        args.output: json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+    })
     print(
         json.dumps(
             {

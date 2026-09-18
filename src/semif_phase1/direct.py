@@ -51,6 +51,8 @@ def _forward(model, inputs):
             call["logits_to_keep"] = 1
         output = model(**call)
         cache = output.past_key_values
+        if cache is None:
+            raise RuntimeError("Long XPU scoring requires a native KV cache")
     return output.logits[:, -1, :]
 
 
