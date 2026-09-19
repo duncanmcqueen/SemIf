@@ -108,7 +108,7 @@ function validate(payload) {
   for (const [index, criterion] of payload.criteria.entries()) {
     if (!criterion.question) return `criterion ${index + 1} has no question`;
     const filled = criterion.options.filter(Boolean);
-    if (filled !== criterion.options.length) return `criterion ${index + 1} has an empty option`;
+    if (filled.length !== criterion.options.length) return `criterion ${index + 1} has an empty option`;
     if (filled.length < MIN_OPTIONS) return `criterion ${index + 1} needs at least ${MIN_OPTIONS} options`;
   }
   return null;

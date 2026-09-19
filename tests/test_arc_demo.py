@@ -28,6 +28,8 @@ def test_static_page_contract():
     assert "Intel Arc" in html
     app = (DEMO / "app.js").read_text()
     assert "/api/health" in app and "/api/score" in app
+    assert "filled.length !== criterion.options.length" in app
+    assert "filled !== criterion.options.length" not in app
     readme = (DEMO / "README.md").read_text()
     assert "ONEAPI_DEVICE_SELECTOR" in readme and "127.0.0.1" in readme
     style = (DEMO / "style.css").read_text()
