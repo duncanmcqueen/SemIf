@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Run typed option logits on an Intel Arc GPU through a small local server." />
+    <title>SemIf — desk lab on Intel Arc</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <aside class="research-notice" role="note"><strong>Independent research project.</strong> Formerly called OpenJev. Not affiliated with or endorsed by TypeSafe. This fork serves the model from an Intel Arc GPU on this machine. No input leaves your network.</aside>
+      <header class="mast">
+        <a class="brand" href="./">SemIf desk lab</a>
+        <div class="mast-actions">
+          <span class="tagline">Semantic ifs from open models, on your desk.</span>
+        </div>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">A live, local experiment</p>
+        <h1>Decision model <mark>on your desk.</mark></h1>
+        <p class="lede">A model on your Intel Arc GPU reads probabilities for your allowed options without decoding any answer text. One shared state prefill serves every criterion you add. Compare it against one full pass per criterion, and measure the difference.</p>
+        <div class="truth-strip">
+          <span>Intel Arc XPU</span><span>server on this machine</span><span>your timings</span><span id="model-size">model loads at server start</span>
+        </div>
+        <p id="device-note" class="device-note">The scorer needs exactly one visible GPU. Set ONEAPI_DEVICE_SELECTOR before you start the server.</p>
+      </section>
+
+      <section class="machine" aria-labelledby="setup-title">
+        <div class="section-head">
+          <div><p class="eyebrow">00 / setup</p><h2 id="setup-title">The server already loaded the model</h2></div>
+          <button id="refresh" type="button">check server</button>
+        </div>
+        <div id="support"><p class="support" role="status">checking server ...</p></div>
+        <div class="quality-card" aria-label="Server run configuration">
+          <div class="quality-heading"><strong>Loaded run</strong><span>reported by /api/health</span></div>
+          <div class="quality-scroll">
+            <table>
+              <thead><tr><th>Model</th><th>Revision</th><th>Dtype</th><th>Attention</th><th>PyTorch</th></tr></thead>
+              <tbody>
+                <tr id="health-row"><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="fine">Weights come from the local Hugging Face cache. The server holds one model in memory and scores one request at a time.</p>
+      </section>
+
+      <section class="workbench" aria-labelledby="workbench-title">
+        <div class="section-head">
+          <div><p class="eyebrow">01 / decision</p><h2 id="workbench-title">Give it a real choice</h2></div>
+          <button id="run" type="button">score both paths</button>
+        </div>
+
+        <div class="presets" aria-label="Prefill an example">
+          <span>Try an example</span>
+          <button type="button" data-preset="account">Account support</button>
+          <button type="button" data-preset="email">Email triage</button>
+          <button type="button" data-preset="trio">Three criteria at once</button>
+        </div>
+
+        <div class="inputs">
+          <label>State<textarea id="state" rows="6">A customer says a password reset succeeded, but every login attempt still returns “account locked”. Two unlock emails were requested and neither arrived.</textarea></label>
+          <div id="criteria" class="criteria"></div>
+          <div class="option-actions">
+            <button id="add-criterion" type="button">+ add criterion</button>
+            <span id="criterion-count">1 / 16</span>
+            <button id="remove-criterion" type="button">remove last</button>
+          </div>
+        </div>
+        <p class="fine">Every criterion shares the exact state text. The shared path prefills the state once and scores all criteria in parallel. The fresh path runs one full forward per criterion.</p>
+      </section>
+
+      <section class="method-map" aria-label="The two scoring paths">
+        <div class="method-input"><small>your decision</small><strong>state + criteria + options</strong></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="method-model"><small>same local model</small><strong id="selected-model">model on Arc XPU</strong></div>
+        <div class="fork" aria-hidden="true">↗<br />↘</div>
+        <div class="method-outputs">
+          <div><small>shared prefill</small><strong>one pass, all criteria</strong></div>
+          <div><small>fresh scoring</small><strong>one pass per criterion</strong></div>
+        </div>
+      </section>
+
+      <section class="race" aria-label="Live comparison results">
+        <article class="lane direct">
+          <div class="lane-head"><div><p class="eyebrow">02A / shared prefill</p><h2>Parallel criteria</h2></div><span class="badge">one state pass</span></div>
+          <p class="explain">The state is prefilled once. Every criterion branches from that cache and reads its option logits in one batch.</p>
+          <div id="shared-output" class="output empty">waiting for a run</div>
+          <dl class="metrics">
+            <div><dt>total</dt><dd id="shared-total">—</dd></div>
+            <div><dt>prefill</dt><dd id="shared-prefill">—</dd></div>
+            <div><dt>suffixes</dt><dd id="shared-suffix">—</dd></div>
+          </dl>
+        </article>
+
+        <article class="lane generated">
+          <div class="lane-head"><div><p class="eyebrow">02B / fresh scoring</p><h2>One pass each</h2></div><span class="badge pink">per criterion</span></div>
+          <p class="explain">Every criterion runs its own full forward over the whole prompt. This is the baseline the shared path must beat.</p>
+          <div id="fresh-output" class="output empty">waiting for a run</div>
+          <dl class="metrics">
+            <div><dt>total</dt><dd id="fresh-total">—</dd></div>
+            <div><dt>per pass</dt><dd id="fresh-per">—</dd></div>
+            <div><dt>passes</dt><dd id="fresh-passes">—</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="verdict" aria-live="polite">
+        <span>shared-to-fresh wall-time ratio</span><strong id="ratio">run it on your GPU</strong>
+        <p id="run-note">Both paths run on the same loaded model, one after the other, so they do not contend for the GPU.</p>
+      </section>
+
+      <details>
+        <summary>What these numbers do—and do not—mean</summary>
+        <div class="details-grid">
+          <p><b>Conditional probabilities.</b> Scores are a softmax over only the displayed option logits. They are not calibrated confidence and do not include every answer the model might prefer.</p>
+          <p><b>Choices can sit on a near-tie.</b> BF16 arithmetic differs between GPU vendors and execution paths. Small logit differences can flip. The repository documents this drift for the A770.</p>
+          <p><b>Real local timing.</b> The server times prefill, suffix passes and full forwards in the current request. No canned results appear.</p>
+          <p><b>One device.</b> The scorer requires exactly one visible GPU per server process, matching the repository rule for reproducible timing.</p>
+        </div>
+      </details>
+
+      <footer><span>SemIf / desk lab</span><span><a href="README.md">implementation notes</a> · <a href="https://github.com/TheoLeeCJ/SemIf">upstream project</a></span></footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

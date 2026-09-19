@@ -188,6 +188,7 @@ Returned probabilities are conditional on the supplied options. Calibrate and va
 - [Intel Arc XPU Port](docs/INTEL_ARC.md) — fork: Arc setup, XPU workaround, and known limits
 - [A770 performance notes](docs/A770-PERF-GAP.md) — fork: measured Arc speed and research leads
 - [A770 specification review](docs/SPEC_REVIEW.md) — fork: audit scope, fixes, and open findings
+- [Desk lab](arc-demo/README.md) — fork: serve the decision page from one Arc GPU on this machine
 - [Results](docs/RESULTS.md) — quality, speed, perturbations, and claim boundaries
 - [Method](docs/METHOD.md) — frozen prompts, metrics, and timing scope
 - [Reproduce](docs/REPRODUCE.md) — exact environment, pinned commands, perturbations, and verification
