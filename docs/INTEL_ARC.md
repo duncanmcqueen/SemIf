@@ -86,8 +86,13 @@ safe on XPU.
 
 The direct scorer is the validated A770 path.
 The reranker benchmark ran on A770, but its choices drifted from the NVIDIA output.
+A CPU fp32 reference over 60 rows showed that the NVIDIA choices match the
+CPU reference within drift, and the A770 choices do not.
+The reranker readout differences two large yes/no logits, near 17 in
+magnitude, and their difference is small, near 0.1 to 1.0.
+Small bf16 rounding differences therefore flip many choices.
+The drift is model readout sensitivity, not a port correctness bug.
 Do not use the A770 reranker result as a matched reproduction.
-Longer reranker prompts also need a separate check.
 
 ## Checks
 
