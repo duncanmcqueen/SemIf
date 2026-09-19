@@ -90,3 +90,38 @@ def test_generation_prefill_chunking_matches_plain_generate():
             max_new_tokens=8, use_cache=True, prefill_chunk_size=7,
         )
     assert torch.equal(plain, chunked)
+
+
+def test_a770_profile_helpers():
+    profiler = benchmark("a770_profile")
+    assert profiler.amdahl_speedup(0.75, 4) == pytest.approx(16 / 7)
+    with pytest.raises(ValueError):
+        profiler.amdahl_speedup(1.1, 2)
+    evidence = profiler._operator_evidence([
+        {"name": "aten::linalg_solve_triangular"},
+        {"name": "causal_conv1d_fn"},
+        {"name": "aten::scaled_dot_product_attention"},
+        {"name": "Memcpy DtoH"},
+    ])
+    assert all(evidence.values())
+
+
+def test_a770_profile_rejects_another_xpu():
+    profiler = benchmark("a770_profile")
+    properties = SimpleNamespace(name="Intel(R) Arc(TM) B580 Graphics")
+    torch = SimpleNamespace(xpu=SimpleNamespace(
+        device_count=lambda: 1, get_device_properties=lambda device: properties,
+    ))
+    with pytest.raises(RuntimeError, match="not an A770"):
+        profiler._device_manifest(torch, SimpleNamespace(type="xpu"))
+
+
+def test_a770_profile_rejects_existing_output_before_model_load(monkeypatch, tmp_path):
+    output = tmp_path / "existing"
+    output.mkdir()
+    monkeypatch.setattr(sys, "argv", [
+        "a770_profile", "--input", "unused.jsonl", "--output-dir", str(output),
+    ])
+    with pytest.raises(SystemExit) as error:
+        benchmark("a770_profile").main()
+    assert error.value.code == 2

@@ -32,6 +32,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--pair-batch-sizes", default="1,4,8")
     parser.add_argument("--max-tokens", type=int, default=4096)
+    parser.add_argument("--attention", choices=("sdpa", "eager"), default="sdpa")
     args = parser.parse_args()
     predictions_path = args.output.with_suffix(".predictions.jsonl")
     if any(
@@ -47,7 +48,7 @@ def main() -> None:
         groups[row["group_id"]].append(row)
     if len(rows) != 777 or len(groups) != 37 or any(len(group) != 21 for group in groups.values()):
         parser.error("Expected the committed 37-state x 21-question fixture")
-    model, tokenizer, metadata = load_causal_model(args.model, args.revision)
+    model, tokenizer, metadata = load_causal_model(args.model, args.revision, args.attention)
     import torch
 
     accelerator = getattr(torch, next(model.parameters()).device.type)

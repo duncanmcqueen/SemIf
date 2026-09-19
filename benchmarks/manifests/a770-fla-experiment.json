@@ -1,0 +1,38 @@
+{
+  "status": "import-gate-passed-device-validation-pending",
+  "checked_at": "2026-09-18",
+  "model": {
+    "source": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+  },
+  "baseline": {
+    "python": "3.10.20",
+    "torch": "2.10.0+xpu",
+    "transformers": "5.17.0",
+    "triton_distribution": "triton-xpu",
+    "triton_version": "3.6.0",
+    "precision": "bfloat16",
+    "attention": "sdpa",
+    "forward_chunk_tokens": 1024
+  },
+  "candidate": {
+    "distribution": "flash-linear-attention",
+    "repository": "https://github.com/fla-org/flash-linear-attention",
+    "commit": "864a87f6ce5be8828bef81eb22baafd41937cdf2",
+    "installed_version": "0.6.0",
+    "extra_installed": {"einops": "0.8.2"},
+    "environment": "/home/dwmcqueen/Projects/jev-arc/venv-fla",
+    "environment_method": "Hard-link clone of the validated .venv; new packages are added only to the clone. Invoke the clone's own interpreter, never its cloned pip script: '<venv>/bin/python -m pip install --no-deps ...'. A cloned pip script retains the original venv's shebang and silently installs into the validated environment.",
+    "install": "/home/dwmcqueen/Projects/jev-arc/venv-fla/bin/python -m pip install --no-deps 'flash-linear-attention @ git+https://github.com/fla-org/flash-linear-attention.git@864a87f6ce5be8828bef81eb22baafd41937cdf2' einops",
+    "reason_for_no_deps": "Preserve the separately installed torch 2.10.0+xpu and triton-xpu 3.6.0 stack; inspect and install any missing pure-Python requirements explicitly.",
+    "causal_conv1d": "not selected: upstream package is CUDA-only; retain the PyTorch fallback"
+  },
+  "import_gate": {
+    "result": "passed-in-experimental-environment",
+    "detail": "transformers hook resolution verified: chunk_gated_delta_rule and fused_recurrent_gated_delta_rule dispatch to FLA; both causal-conv1d hooks remain PyTorch fallbacks.",
+    "device_selector": "opencl:1;level_zero:1",
+    "device_selector_requirement": "FLA imports abort (C++ sycl::exception, SIGABRT) under a Level-Zero-only ONEAPI_DEVICE_SELECTOR because triton-xpu 3.6.0 driver.c init_devices probes for the OpenCL-backend twin device, which a level_zero-only filter excludes. Adding the matching opencl entry keeps torch.xpu.device_count()==1 with the A770 visible while satisfying the probe. Always confirm the device name is A770 after reboot; indices can change.",
+    "torch_note": "importing fla prints a Python-below-3.11-recommended warning; informational only.",
+    "not_yet_proven": "Triton kernel compilation, execution, numerics, and performance on the A770 remain unproven pending the profile run."
+  }
+}

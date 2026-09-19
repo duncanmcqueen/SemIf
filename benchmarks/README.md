@@ -50,6 +50,42 @@ CUDA_VISIBLE_DEVICES=0 python benchmarks/shape777_reranker.py \
 
 The 6.7 MB fixture is project-authored and has SHA-256 `8dcf414b12fc2684e3c4ca5f3ebfd3f525f5346fec4a9bc67eb65138101f55f1`. Both runners write aggregate timings and row-level predictions.
 
+## A770 hybrid-path profiling
+
+Run baseline and FLA-candidate experiments in separate environments. The
+candidate pin and stack constraints are recorded in
+`manifests/a770-fla-experiment.json`; do not install it into the validated
+baseline environment. The runner requires exactly one visible XPU and rejects
+devices whose reported name is not A770. Every output directory must be new.
+
+```bash
+ONEAPI_DEVICE_SELECTOR=level_zero:1 python benchmarks/a770_profile.py \
+  --input benchmarks/data/shape777.jsonl \
+  --output-dir /path/to/new-a770-baseline-profile
+```
+
+Repeat the command in the candidate environment with a different output path
+and `--require-fla`. That flag verifies that Transformers dispatched both the
+chunked and recurrent GatedDeltaNet functions to FLA rather than accepting a
+successful import as evidence. Each report records the complete installed
+package inventory, repository revision, driver and device identity, model
+metadata, resolved kernel implementations, synchronized repeated timings,
+numerical outputs, operator evidence, and CPU/XPU Chrome traces for direct,
+serial cache-hit, and shared scoring.
+
+FLA candidate runs additionally need
+`ONEAPI_DEVICE_SELECTOR="opencl:1;level_zero:1"`: triton-xpu probes for the
+OpenCL-backend twin device at FLA import time, and a Level-Zero-only filter
+makes that probe abort the process. The dual-backend selector keeps
+`torch.xpu.device_count()` at one with the A770 visible. Verify the device
+name after every boot; indices can change.
+
+Use `--row-id` to select another prompt, including boundary-length fixtures.
+Use separate create-only runs for lengths 1024, 1025, near 1813, and 2049.
+The report deliberately does not sum nested profiler events into wall-time
+fractions. After non-overlapping timeline analysis, record an Amdahl estimate
+with `--amdahl-fraction F --amdahl-component-speedup S`.
+
 ## Quality evidence
 
 - `data/authored144.jsonl` is the complete owned labeled workload.
